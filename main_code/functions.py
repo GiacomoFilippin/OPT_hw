@@ -170,6 +170,4 @@ def gradient(W_bar, W, y_lab, y_unlab_pred):
     grad_second_term = -np.sum(W_bar * (y_unlab_pred[:, np.newaxis] - y_unlab_pred[np.newaxis, :]), axis=1)
 
     return grad_first_term + grad_second_term
-
-    -2*problem_to_solve(W_bar, W, y_lab, y_unlab_pred)
     

@@ -40,3 +40,96 @@ W = compute_labeled_unlabeled_weights_vectorized(X_lab, X_unlab)
 # i need to define the gradient of the problem, and then implement the BCGD with GS rule (with dimension 1) and coordinate minimization
 
 
+# %% EXPERIMENTAL
+
+
+def compute_accuracy(X, y_sparse, weights):
+    y_pred = predict(X, weights)
+    y_true = y_sparse.argmax(axis=1).A1
+    accuracy = np.mean(y_pred == y_true)
+    return accuracy
+
+def gradient_descent(X, y, X_val, y_val, weights, learning_rate, num_epochs):
+    m, n = X.shape
+    trainloss_history = []
+    valloss_history = []
+    trainacc_history = []
+    valacc_history = []
+
+    for epoch in range(num_epochs):
+        grad = gradient(W_bar, W, y_lab, y_unlab_pred)
+        weights -= learning_rate * grad
+
+        if epoch % 5 == 0:
+            train_cost = compute_cost(X, y, weights)
+            val_cost = compute_cost(X_val, y_val, weights)
+            train_accuracy = compute_accuracy(X, y, weights)
+            val_accuracy = compute_accuracy(X_val, y_val, weights)
+        
+            trainloss_history.append(train_cost)
+            valloss_history.append(val_cost)
+            trainacc_history.append(train_accuracy)
+            valacc_history.append(val_accuracy)
+
+            print(f'Epoch {epoch} completed')
+            print(f'Train Cost: {train_cost}, Train Accuracy: {train_accuracy}')
+            print(f'Validation Cost: {val_cost}, Validation Accuracy: {val_accuracy}')
+    
+    return weights, trainloss_history, valloss_history, trainacc_history, valacc_history
+
+# function that finds the block with higher norm of the gradient
+# why? because it is the block that will have the most impact on the cost function
+# and will be the most beneficial to update
+def gauss_southwell_rule(gradient, block_size):
+    n = gradient.shape[0]
+    n_blocks = (n + block_size - 1) // block_size
+    norms = [np.linalg.norm(gradient[i*block_size:(i+1)*block_size]) for i in range(n_blocks)]
+    return np.argmax(norms)
+
+
+def block_coordinate_gradient_descent_gs(X, y, X_val, y_val, weights, learning_rate, num_epochs, block_size):
+    m, n = X.shape
+    n_blocks = (n + block_size - 1) // block_size
+    trainloss_history = []
+    valloss_history = []
+    trainacc_history = []
+    valacc_history = []
+    
+    for epoch in range(num_epochs):
+        # what does this do?
+        # it computes the gradient of the cost function with respect to the weights
+        # it is the same as the gradient descent algorithm, but we will only update a block of weights
+        logits = X.dot(weights)
+        probs = softmax(logits)
+        gradient = X.T.dot(probs - y) / m
+        
+        # Chooses the block to opdate with the max norm of the gradient
+        block_idx = gauss_southwell_rule(gradient, block_size)
+        start = block_idx * block_size
+        end = min((block_idx + 1) * block_size, n)
+        
+        # updates selected block
+        weights[start:end, :] -= learning_rate * gradient[start:end, :]
+
+        if epoch % 5 == 0:        
+            train_cost = compute_cost(X, y, weights)
+            val_cost = compute_cost(X_val, y_val, weights)
+            train_accuracy = compute_accuracy(X, y, weights)
+            val_accuracy = compute_accuracy(X_val, y_val, weights)
+        
+            trainloss_history.append(train_cost)
+            valloss_history.append(val_cost)
+            trainacc_history.append(train_accuracy)
+            valacc_history.append(val_accuracy)
+
+            print(f'Epoch {epoch} completed')
+            print(f'Train Cost: {train_cost}, Train Accuracy: {train_accuracy}')
+            print(f'Validation Cost: {val_cost}, Validation Accuracy: {val_accuracy}')
+    
+    return weights, trainloss_history, valloss_history, trainacc_history, valacc_history
+
+def predict(X, weights):
+    logits = X.dot(weights)
+    return np.argmax(logits, axis=1)
+
+# %%
