@@ -133,3 +133,7 @@ def predict(X, weights):
     return np.argmax(logits, axis=1)
 
 # %%
+"""Distinzione Sottile: A volte, si usa "Coordinate Gradient Descent" quando si fa un passo di gradiente lungo la coordinata 
+e "Coordinate Minimization" quando si minimizza esattamente la funzione obiettivo rispetto a quella coordinata. 
+Se il BCGD richiesto nella prima parte implica un passo di gradiente, la seconda parte ("Coordinate Minimization") 
+potrebbe riferirsi alla versione con minimizzazione esatta."""
