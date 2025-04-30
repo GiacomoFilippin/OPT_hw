@@ -1,5 +1,5 @@
 # %%
-from functions import compute_weights_vectorized, compute_labeled_unlabeled_weights_vectorized, problem_to_solve, gradient, generate_semi_supervised_data
+from functions import get_data_dir, load_higgs_data, compute_weights_vectorized, compute_labeled_unlabeled_weights_vectorized, problem_to_solve, gradient, generate_semi_supervised_data
 import numpy as np
 
 X_lab, y_lab, X_unlab = generate_semi_supervised_data(

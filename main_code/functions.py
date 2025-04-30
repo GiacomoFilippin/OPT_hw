@@ -3,7 +3,56 @@ import numpy as np
 from sklearn.datasets import make_moons, make_blobs
 from sklearn.model_selection import train_test_split
 from scipy.spatial.distance import cdist
-import numpy as np
+import os
+import pandas as pd
+
+def get_data_dir():
+    try:
+        # Assumes the script/notebook is in the 'main_code' directory
+        script_dir = os.path.dirname(__file__)
+    except NameError:
+        # Fallback if __file__ is not defined (common in notebooks/interactive)
+        # Assumes the current working directory is 'main_code' or 'OPT_hw'
+        # If cwd is OPT_hw, remove the '..' in the join below.
+        # If cwd is main_code, this structure works.
+        script_dir = os.getcwd()
+        # If your notebook/script is actually in OPT_hw, adjust the path construction:
+        # data_dir = os.path.abspath(os.path.join(script_dir, 'data', 'raw', 'archive'))
+
+
+    # Construct the path relative to the parent directory of script_dir
+    # Goes up one level from script_dir (main_code) to OPT_hw, then into data/raw/archive
+    data_dir_relative = os.path.join(script_dir, '..', 'data', 'raw', 'archive')
+
+    # Get the absolute, normalized path (resolves '..')
+    data_dir = os.path.abspath(data_dir_relative)
+
+    print(f"Data directory path: {data_dir}")
+    return data_dir
+
+# load training.csv from the data directory
+def load_data(data_dir_path):
+    """
+    Loads the training data from a CSV file.
+
+    Args:
+        data_dir_path (str): Path to the directory containing the CSV file.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the loaded data.
+    """
+    # Construct the full path to the CSV file
+    csv_file_path = os.path.join(data_dir_path, 'training.csv')
+
+    # Load the CSV file into a DataFrame
+    df = pd.read_csv(csv_file_path)
+
+    # Display the first few rows of the DataFrame
+    print(f"Loaded data from {csv_file_path}")
+    print(df.head())
+
+    return df
+
 
 def generate_semi_supervised_data(n_samples=10000, noise=0.15, labeled_proportion=0.1, random_state=42):
     """
