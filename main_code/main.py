@@ -39,101 +39,68 @@ W = compute_labeled_unlabeled_weights_vectorized(X_lab, X_unlab)
 
 # i need to define the gradient of the problem, and then implement the BCGD with GS rule (with dimension 1) and coordinate minimization
 
-
-# %% EXPERIMENTAL
-
-
-def compute_accuracy(X, y_sparse, weights):
-    y_pred = predict(X, weights)
-    y_true = y_sparse.argmax(axis=1).A1
-    accuracy = np.mean(y_pred == y_true)
-    return accuracy
-
-def gradient_descent(X, y, X_val, y_val, weights, learning_rate, num_epochs):
-    m, n = X.shape
-    trainloss_history = []
-    valloss_history = []
-    trainacc_history = []
-    valacc_history = []
-
-    for epoch in range(num_epochs):
-        grad = gradient(W_bar, W, y_lab, y_unlab_pred)
-        weights -= learning_rate * grad
-
-        if epoch % 5 == 0:
-            train_cost = compute_cost(X, y, weights)
-            val_cost = compute_cost(X_val, y_val, weights)
-            train_accuracy = compute_accuracy(X, y, weights)
-            val_accuracy = compute_accuracy(X_val, y_val, weights)
-        
-            trainloss_history.append(train_cost)
-            valloss_history.append(val_cost)
-            trainacc_history.append(train_accuracy)
-            valacc_history.append(val_accuracy)
-
-            print(f'Epoch {epoch} completed')
-            print(f'Train Cost: {train_cost}, Train Accuracy: {train_accuracy}')
-            print(f'Validation Cost: {val_cost}, Validation Accuracy: {val_accuracy}')
-    
-    return weights, trainloss_history, valloss_history, trainacc_history, valacc_history
-
-# function that finds the block with higher norm of the gradient
-# why? because it is the block that will have the most impact on the cost function
-# and will be the most beneficial to update
-def gauss_southwell_rule(gradient, block_size):
-    n = gradient.shape[0]
-    n_blocks = (n + block_size - 1) // block_size
-    norms = [np.linalg.norm(gradient[i*block_size:(i+1)*block_size]) for i in range(n_blocks)]
-    return np.argmax(norms)
-
-
-def block_coordinate_gradient_descent_gs(X, y, X_val, y_val, weights, learning_rate, num_epochs, block_size):
-    m, n = X.shape
-    n_blocks = (n + block_size - 1) // block_size
-    trainloss_history = []
-    valloss_history = []
-    trainacc_history = []
-    valacc_history = []
-    
-    for epoch in range(num_epochs):
-        # what does this do?
-        # it computes the gradient of the cost function with respect to the weights
-        # it is the same as the gradient descent algorithm, but we will only update a block of weights
-        logits = X.dot(weights)
-        probs = softmax(logits)
-        gradient = X.T.dot(probs - y) / m
-        
-        # Chooses the block to opdate with the max norm of the gradient
-        block_idx = gauss_southwell_rule(gradient, block_size)
-        start = block_idx * block_size
-        end = min((block_idx + 1) * block_size, n)
-        
-        # updates selected block
-        weights[start:end, :] -= learning_rate * gradient[start:end, :]
-
-        if epoch % 5 == 0:        
-            train_cost = compute_cost(X, y, weights)
-            val_cost = compute_cost(X_val, y_val, weights)
-            train_accuracy = compute_accuracy(X, y, weights)
-            val_accuracy = compute_accuracy(X_val, y_val, weights)
-        
-            trainloss_history.append(train_cost)
-            valloss_history.append(val_cost)
-            trainacc_history.append(train_accuracy)
-            valacc_history.append(val_accuracy)
-
-            print(f'Epoch {epoch} completed')
-            print(f'Train Cost: {train_cost}, Train Accuracy: {train_accuracy}')
-            print(f'Validation Cost: {val_cost}, Validation Accuracy: {val_accuracy}')
-    
-    return weights, trainloss_history, valloss_history, trainacc_history, valacc_history
-
-def predict(X, weights):
-    logits = X.dot(weights)
-    return np.argmax(logits, axis=1)
-
-# %%
 """Distinzione Sottile: A volte, si usa "Coordinate Gradient Descent" quando si fa un passo di gradiente lungo la coordinata 
 e "Coordinate Minimization" quando si minimizza esattamente la funzione obiettivo rispetto a quella coordinata. 
 Se il BCGD richiesto nella prima parte implica un passo di gradiente, la seconda parte ("Coordinate Minimization") 
 potrebbe riferirsi alla versione con minimizzazione esatta."""
+
+
+# %%
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import pandas as pd
+import numpy as np
+import plotly.express as px
+
+# read the data from the file data/raw/archive/train.csv e test.csv
+data_dir = get_data_dir()
+higgs_dataset = load_higgs_data(data_dir)
+
+# --- Verifica Nomi Colonne (IMPORTANTE) ---
+# Stampa i nomi delle colonne per assicurarti che 'EventId' e 'Label' siano corretti
+# e per identificare le colonne delle features.
+print("Columns:", higgs_dataset.columns)
+# Esempio: Se la prima è 'EventId', l'ultima 'Label', e le altre sono features:
+index_col_name = higgs_dataset.columns[0] # Es: 'EventId'
+label_col_name = higgs_dataset.columns[-1] # Es: 'Label'
+feature_col_names = higgs_dataset.columns[1:-1] # Colonne tra indice e label
+# -----------------------------------------
+
+# Crea una copia per sicurezza (opzionale ma consigliato)
+df_work = higgs_dataset.copy()
+
+# Standardize only the feature columns
+scaler = StandardScaler()
+# Applica lo scaler solo alle colonne delle features, mantenendo il DataFrame
+df_work[feature_col_names] = scaler.fit_transform(df_work[feature_col_names])
+
+# apply PCA with 3 components to the scaled feature data
+pca = PCA(n_components=3)
+# Applica PCA solo alle colonne delle features scalate
+X_pca_3d = pca.fit_transform(df_work[feature_col_names])
+
+# Create a DataFrame for plotting, using the original index for alignment
+pca_df = pd.DataFrame(data=X_pca_3d, columns=['PC1', 'PC2', 'PC3'], index=df_work.index)
+
+# Aggiungi la colonna Label originale al DataFrame PCA, pandas allinea automaticamente usando l'indice
+pca_df[label_col_name] = df_work[label_col_name]
+
+# Ora pca_df contiene le componenti PCA e la label corretta per ogni riga originale
+
+# plot the data in the 3D PCA space using Plotly
+fig = px.scatter_3d(pca_df,
+                    x='PC1',
+                    y='PC2',
+                    z='PC3',
+                    color=label_col_name, # Usa il nome corretto della colonna label
+                    title='Higgs Dataset PCA Projection (3 Components, Standardized)',
+                    labels={'PC1': 'Principal Component 1',
+                            'PC2': 'Principal Component 2',
+                            'PC3': 'Principal Component 3'},
+                    opacity=0.7,
+                    color_discrete_map={'s': 'red', 'b': 'blue'}) # Mappa le etichette ai colori
+
+fig.update_layout(margin=dict(l=0, r=0, b=0, t=40))
+fig.update_traces(marker=dict(size=3))
+fig.show()
+# %%

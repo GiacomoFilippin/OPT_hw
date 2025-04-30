@@ -31,7 +31,7 @@ def get_data_dir():
     return data_dir
 
 # load training.csv from the data directory
-def load_data(data_dir_path):
+def load_higgs_data(data_dir_path):
     """
     Loads the training data from a CSV file.
 
