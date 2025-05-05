@@ -1,7 +1,8 @@
 # %%
 from functions import get_data_dir, load_higgs_data, compute_weights_vectorized, compute_labeled_unlabeled_weights_vectorized, problem_to_solve, gradient, generate_semi_supervised_data
 import numpy as np
-
+data_dir = get_data_dir()
+# %%
 X_lab, y_lab, X_unlab = generate_semi_supervised_data(
     n_samples=10000, noise=0.8, labeled_proportion=0.15, random_state=42
 )
@@ -45,62 +46,126 @@ Se il BCGD richiesto nella prima parte implica un passo di gradiente, la seconda
 potrebbe riferirsi alla versione con minimizzazione esatta."""
 
 
-# %%
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
+# %% REAL DATA LOADING
+# --- Loading Spambase Dataset ---
+import os
 import pandas as pd
-import numpy as np
+data_filename = os.path.join(data_dir, "spambase.data")
+
+# Definisci i nomi delle colonne basandoti sulla descrizione in spambase.names
+# (57 attributi + 1 colonna target 'is_spam')
+
+# Nomi generici per le frequenze delle parole (48 colonne)
+# Potresti estrarre i nomi specifici da spambase.DOCUMENTATION se necessario
+word_freq_names = [f'word_freq_{i+1}' for i in range(48)]
+
+# Nomi per le frequenze dei caratteri (6 colonne)
+char_freq_names = ['char_freq_;', 'char_freq_(', 'char_freq_[',
+                   'char_freq_!', 'char_freq_$', 'char_freq_#'] # Nomi specifici da documentazione
+
+# Nomi per le lunghezze delle sequenze di maiuscole (3 colonne)
+capital_run_names = [
+    'capital_run_length_average',
+    'capital_run_length_longest',
+    'capital_run_length_total'
+]
+
+# Nome della colonna target (1 colonna)
+target_name = ['is_spam']
+
+# Combina tutti i nomi in ordine
+column_names = word_freq_names + char_freq_names + capital_run_names + target_name
+
+# Verifica che il numero totale di nomi sia corretto (58)
+if len(column_names) != 58:
+    print(f"Attenzione: Generati {len(column_names)} nomi, ma ne sono attesi 58.")
+
+try:
+    # Carica il file .data usando pandas
+    # header=None perché il file non ha intestazioni
+    # names=column_names per assegnare i nomi definiti sopra
+    df = pd.read_csv(data_filename, header=None, names=column_names)
+
+    print("Dati caricati con successo in un DataFrame pandas:")
+    print(df.head()) # Mostra le prime 5 righe
+
+    # Puoi vedere informazioni riassuntive sul DataFrame
+    print("\nInformazioni sul DataFrame:")
+    df.info()
+
+    # Ora puoi usare il DataFrame 'df' per analisi o addestramento modelli
+    # Esempio: separare features (X) e target (y)
+    # X = df.drop('is_spam', axis=1)
+    # y = df['is_spam']
+    # print("\nPrime 5 righe delle features (X):")
+    # print(X.head())
+    # print("\nPrime 5 righe della variabile target (y):")
+    # print(y.head())
+
+
+except FileNotFoundError:
+    print(f"Errore: File non trovato '{data_filename}'.")
+    print(f"Assicurati che il file esista nella directory: '{os.path.abspath(data_dir)}'")
+    print("Esegui prima lo script 'data downloader.py'.")
+except Exception as e:
+    print(f"Errore durante il caricamento del file '{data_filename}': {e}")
+
+# %%
+# --- PCA Visualization for Spambase Dataset ---
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 import plotly.express as px
+import pandas as pd # Assicurati che pandas sia importato
 
-# read the data from the file data/raw/archive/train.csv e test.csv
-data_dir = get_data_dir()
-higgs_dataset = load_higgs_data(data_dir)
+# Verifica che il DataFrame 'df' esista e contenga i dati Spambase
+if 'df' not in locals():
+    print("Errore: Il DataFrame 'df' con i dati Spambase non è stato trovato.")
+    print("Assicurati di aver eseguito la cella precedente che carica 'spambase.data'.")
+else:
+    # Separa features (X) e target (y)
+    spambase_target_col = 'is_spam'
+    spambase_feature_cols = df.columns.drop(spambase_target_col)
 
-# --- Verifica Nomi Colonne (IMPORTANTE) ---
-# Stampa i nomi delle colonne per assicurarti che 'EventId' e 'Label' siano corretti
-# e per identificare le colonne delle features.
-print("Columns:", higgs_dataset.columns)
-# Esempio: Se la prima è 'EventId', l'ultima 'Label', e le altre sono features:
-index_col_name = higgs_dataset.columns[0] # Es: 'EventId'
-label_col_name = higgs_dataset.columns[-1] # Es: 'Label'
-feature_col_names = higgs_dataset.columns[1:-1] # Colonne tra indice e label
-# -----------------------------------------
+    X_spam = df[spambase_feature_cols]
+    y_spam = df[spambase_target_col]
 
-# Crea una copia per sicurezza (opzionale ma consigliato)
-df_work = higgs_dataset.copy()
+    # Standardizza le features
+    scaler_spam = StandardScaler()
+    X_spam_scaled = scaler_spam.fit_transform(X_spam)
 
-# Standardize only the feature columns
-scaler = StandardScaler()
-# Applica lo scaler solo alle colonne delle features, mantenendo il DataFrame
-df_work[feature_col_names] = scaler.fit_transform(df_work[feature_col_names])
+    # Applica PCA con 3 componenti
+    pca_spam = PCA(n_components=3)
+    X_pca_3d_spam = pca_spam.fit_transform(X_spam_scaled)
 
-# apply PCA with 3 components to the scaled feature data
-pca = PCA(n_components=3)
-# Applica PCA solo alle colonne delle features scalate
-X_pca_3d = pca.fit_transform(df_work[feature_col_names])
+    # Crea un DataFrame per il plotting
+    # Usa l'indice originale di df per mantenere l'allineamento
+    pca_df_spam = pd.DataFrame(data=X_pca_3d_spam,
+                               columns=['PC1', 'PC2', 'PC3'],
+                               index=df.index)
 
-# Create a DataFrame for plotting, using the original index for alignment
-pca_df = pd.DataFrame(data=X_pca_3d, columns=['PC1', 'PC2', 'PC3'], index=df_work.index)
+    # Aggiungi la colonna target originale al DataFrame PCA
+    pca_df_spam[spambase_target_col] = y_spam
 
-# Aggiungi la colonna Label originale al DataFrame PCA, pandas allinea automaticamente usando l'indice
-pca_df[label_col_name] = df_work[label_col_name]
+    # Plotta i dati nello spazio PCA 3D usando Plotly
+    fig_spam = px.scatter_3d(pca_df_spam,
+                             x='PC1',
+                             y='PC2',
+                             z='PC3',
+                             color=spambase_target_col, # Colora per 'is_spam'
+                             title='Spambase Dataset PCA Projection (3 Components, Standardized)',
+                             labels={'PC1': 'Principal Component 1',
+                                     'PC2': 'Principal Component 2',
+                                     'PC3': 'Principal Component 3',
+                                     spambase_target_col: 'Is Spam (1=Spam, 0=Not Spam)'}, # Etichetta legenda
+                             opacity=0.7,
+                             color_continuous_scale=px.colors.sequential.Viridis, # Scala di colori per 0/1
+                             # Se preferisci colori discreti:
+                             # color_discrete_map={0: 'blue', 1: 'red'} # Mappa 0 e 1 ai colori
+                             )
 
-# Ora pca_df contiene le componenti PCA e la label corretta per ogni riga originale
+    fig_spam.update_layout(margin=dict(l=0, r=0, b=0, t=40))
+    # Rendi i punti leggermente più piccoli se sono troppi
+    fig_spam.update_traces(marker=dict(size=2))
+    fig_spam.show()
 
-# plot the data in the 3D PCA space using Plotly
-fig = px.scatter_3d(pca_df,
-                    x='PC1',
-                    y='PC2',
-                    z='PC3',
-                    color=label_col_name, # Usa il nome corretto della colonna label
-                    title='Higgs Dataset PCA Projection (3 Components, Standardized)',
-                    labels={'PC1': 'Principal Component 1',
-                            'PC2': 'Principal Component 2',
-                            'PC3': 'Principal Component 3'},
-                    opacity=0.7,
-                    color_discrete_map={'s': 'red', 'b': 'blue'}) # Mappa le etichette ai colori
-
-fig.update_layout(margin=dict(l=0, r=0, b=0, t=40))
-fig.update_traces(marker=dict(size=3))
-fig.show()
 # %%
